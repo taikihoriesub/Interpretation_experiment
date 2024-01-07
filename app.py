@@ -20,10 +20,8 @@ from kivy.uix.togglebutton import ToggleButtonBehavior
 import time
 import random
 import string
-
-from PIL import Image as PILImage
-
 from kivy.core.window import Window
+
 Window.fullscreen = True
 
 
