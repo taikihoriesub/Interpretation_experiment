@@ -21,8 +21,12 @@ import random
 import string
 from kivy.core.window import Window
 from kivy.clock import Clock
+from kivy.config import Config
+from kivy.uix.popup import Popup
 
 pixel_size = 512.0
+# マウスの右クリックを無視する設定
+Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
 
 #描図ウィジェットの設定を行う
 class DrawWidget(Widget):
@@ -35,13 +39,25 @@ class DrawWidget(Widget):
         self.last_touch_pos = None
     
     def on_touch_down(self, touch):
-        if self.parent.collide_point(*touch.pos):
+        # 右クリックを無視する
+        if touch.button == 'right':
+            return False
+        # 左クリックまたはタッチ操作のみをチェック
+        if touch.button == 'left' and self.parent.collide_point(*touch.pos):
             self.last_touch_pos = touch.pos
             self.update_drawing(touch)
+            return True
+        return False
 
     def on_touch_move(self, touch):
-        if self.parent.collide_point(*touch.pos) and self.last_touch_pos:
+        # 右クリックを無視する
+        if touch.button == 'right':
+            return False
+        # 左クリックまたはタッチ操作のみをチェック
+        if touch.button == 'left' and self.parent.collide_point(*touch.pos) and self.last_touch_pos:
             self.update_drawing(touch)
+            return True
+        return False
     
     #モードに応じた描図の更新の機能
     def update_drawing(self, touch):
@@ -140,6 +156,7 @@ class RadioButton(ToggleButton):
 class ImageViewerApp(App):
     selected_user_id = None
     selected_user_name = None
+    session_type = None 
     user_data = []
     filtered_users = []
 
@@ -156,8 +173,8 @@ class ImageViewerApp(App):
 
         self.description_label = Label(
         text="""Please open this app in FULL-SCREEN and write your first name in the textbox and select your session type.
-        If this is your first session (not assisted), choose session type A;
-        if it is your second session (assisted), choose session type B.""",
+        If this is your first session (not assisted), choose session type origine;
+        if it is your second session (assisted), choose session type AI.""",
         font_size='20sp',
         size_hint_y=None,
         height=90,
@@ -232,6 +249,16 @@ class ImageViewerApp(App):
     def start_session(self, instance):
         current_click_time = time.time()
         if current_click_time - self.last_click_time < 0.3: 
+            # セッションの開始前にユーザーとセッションタイプが選択されているか確認
+            if not self.selected_user_id or not self.session_type:
+                message = 'Please select both a session type and a user before starting.'
+                if not self.selected_user_id:
+                    message = 'Please select a user before starting.'
+                elif not self.session_type:
+                    message = 'Please select a session type before starting.'
+                popup = Popup(title='Start Error', content=Label(text=message), size_hint=(None, None), size=(800, 500))
+                popup.open()
+                return  # ポップアップを表示後、セッション開始を中止
             global block
             block = 0
             user_id = self.selected_user_id
@@ -270,7 +297,7 @@ class ImageViewerApp(App):
             self.draw_mode_button = RadioButton(size_hint_y=None, height=15, text='Draw Mode', group='mode', on_press=lambda instance: self.draw_widget.set_draw_mode(), font_size='18sp', size_hint=(1, 1))
             self.erase_mode_button = RadioButton(size_hint_y=None, height=15, text='Erase Mode', group='mode', on_press=lambda instance: self.draw_widget.set_erase_mode(), font_size='18sp', size_hint=(1, 1))
             self.neutral_mode_button = RadioButton(size_hint_y=None, height=15, text='Neutral Mode', group='mode', on_press=lambda instance: self.draw_widget.set_neutral_mode(), font_size='18sp', size_hint=(1, 1))
-            self.clear_button = RadioButton(size_hint_y=None, height=15, text='erase all', group='mode', on_press=lambda instance: self.draw_widget.clear_canvas(), font_size='18sp', size_hint=(1, 1))
+            self.clear_button = RadioButton(size_hint_y=None, height=15, text='Erase all', group='mode', on_press=lambda instance: self.draw_widget.clear_canvas(), font_size='18sp', size_hint=(1, 1))
 
             mode_button_layout.add_widget(self.draw_mode_button)
             mode_button_layout.add_widget(self.erase_mode_button)
@@ -292,8 +319,8 @@ class ImageViewerApp(App):
             radio_button_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, 0.05))
 
             # Create radio buttons for True and False options
-            self.true_radio_button = RadioButton(state='normal',size_hint_y=None, height=30, text='True', group='response', font_size='20sp')
-            self.false_radio_button = RadioButton(state='normal',size_hint_y=None, height=30, text='False', group='response', font_size='20sp')
+            self.true_radio_button = RadioButton(state='normal',size_hint_y=None, height=30, text='Abnormal', group='response', font_size='20sp')
+            self.false_radio_button = RadioButton(state='normal',size_hint_y=None, height=30, text='Normal', group='response', font_size='20sp')
 
             self.radio_button_label = Label(text='Abnormal ?', size_hint=(1, 0.05), font_size='20sp')
 
@@ -404,8 +431,8 @@ class ImageViewerApp(App):
         radio_button_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint=(1, 0.05))
 
         # Create radio buttons for True and False options
-        self.true_radio_button = RadioButton(state='normal',size_hint_y=None, height=30, text='True', group='response', font_size='20sp')
-        self.false_radio_button = RadioButton(state='normal',size_hint_y=None, height=30, text='False', group='response', font_size='20sp')
+        self.true_radio_button = RadioButton(state='normal',size_hint_y=None, height=30, text='Abnormal', group='response', font_size='20sp')
+        self.false_radio_button = RadioButton(state='normal',size_hint_y=None, height=30, text='Normal', group='response', font_size='20sp')
 
         self.radio_button_label = Label(text='Abnormal ?', size_hint=(1, 0.05), font_size='20sp')
 
@@ -502,7 +529,30 @@ class ImageViewerApp(App):
 
     def next_image(self, instance):
         current_click_time = time.time()
-        if current_click_time - self.last_click_time < 0.3: 
+        if current_click_time - self.last_click_time < 0.3:
+            # True/Falseが選択されているか確認
+            if self.true_radio_button.state == 'normal' and self.false_radio_button.state == 'normal':
+                popup = Popup(title='Error',
+                              content=Label(text='Select Abnormal or Normal before proceeding to the next image!'),
+                              size_hint=(None, None), size=(800, 500))
+                popup.open()
+                return  # 何も選択されていない場合はここで処理を終了
+            
+            # "False" が選択され、マーカーで描図がされているか確認
+            if self.true_radio_button.state == 'down' and not self.draw_widget.get_drawn_points():
+                popup = Popup(title='Inconsistent Data',
+                            content=Label(text='You marked no area but selected "Normal" for abnormality. Please check your drawing again.'),
+                            size_hint=(None, None), size=(1000, 500))
+                popup.open()
+                return
+            
+            if self.false_radio_button.state == 'down' and self.draw_widget.get_drawn_points():
+                popup = Popup(title='Inconsistent Data',
+                            content=Label(text='You marked areas but selected "Abnormal" for abnormality. Please check your drawing again.'),
+                            size_hint=(None, None), size=(1000, 500))
+                popup.open()
+                return
+            
             elapsed_time = (datetime.datetime.now() - self.page_start_time).total_seconds()
             self.page_start_time = datetime.datetime.now()
 
@@ -513,59 +563,43 @@ class ImageViewerApp(App):
             conducted_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             image_name = os.path.splitext(os.path.basename(self.images[self.current_image_index]))[0]
 
-            # True/Falseの値を取得
-            abnormal_response = 'True' if self.true_radio_button.state == 'down' else 'False'
+            abnormal_response = 'Abnormal' if self.true_radio_button.state == 'down' else 'Normal'
 
-            # 画像パスを取得
-            # save_folderの定義
-            home_directory = os.path.expanduser('~')
-            
-            # 赤色の座標を取得して正規化
             raw_points = self.draw_widget.get_drawn_points()
             normalized_points = [(self.draw_widget.normalize_point(x, y, size)) for x, y, size in raw_points]
-            # 512x512の画像サイズに対する相対座標に変換
             unique_points = self.generate_unique_points_set(normalized_points)
             points_str = self.store_efficiently(unique_points)
             
-            # user_dataに必要なデータを追加する
             self.user_data.append([
                 self.session_id, user_id, self.session_type, confidence, 
                 round(elapsed_time, 2), conducted_time, image_name, 
                 abnormal_response, points_str
             ])
             
-
             self.true_radio_button.state = 'normal'
             self.false_radio_button.state = 'normal'
-
-            # 次の画像に進む前にマーカー情報をクリア
             self.draw_widget.clear_canvas()
 
             self.current_image_index += 1
-
             if self.current_image_index >= len(self.images):
-                self.save_data_to_csv()  # 現在のセッションデータを保存
+                self.save_data_to_csv()
                 global block
-                block += 1 
+                block += 1
                 next_folder = self.find_next_block_folder()
                 if next_folder:
-                    self.show_break_screen()  # 休憩画面を表示
+                    self.show_break_screen()
                 else:
-                    self.stop_app()  # 次のブロックがない場合はアプリを終了
+                    self.stop_app()
             else:
-                # 通常の画像表示ロジック
                 self.image_widget.source = self.images[self.current_image_index]
                 self.confidence_slider.value = 50
                 self.confidence_label.text = 'Confidence: 50'
-            
-            # モードボタンの状態に基づいて描画モードを設定
-            if self.draw_mode_button.state == 'down':
-                self.draw_widget.set_draw_mode()
-            elif self.erase_mode_button.state == 'down':
-                self.draw_widget.set_erase_mode()
-            elif self.neutral_mode_button.state == 'down':
-                self.draw_widget.set_neutral_mode()
-
+                if self.draw_mode_button.state == 'down':
+                    self.draw_widget.set_draw_mode()
+                elif self.erase_mode_button.state == 'down':
+                    self.draw_widget.set_erase_mode()
+                elif self.neutral_mode_button.state == 'down':
+                    self.draw_widget.set_neutral_mode()
         self.last_click_time = current_click_time
 
     def __init__(self, **kwargs):
